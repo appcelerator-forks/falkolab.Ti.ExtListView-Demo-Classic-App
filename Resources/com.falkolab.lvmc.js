@@ -1,4 +1,4 @@
-	
+
 exports.createListView = function(opts) {	
 	if (opts.sections) {
 		_.each(opts.sections, function(sectionOpts) {
@@ -21,7 +21,7 @@ exports.createListView = function(opts) {
 		
 		// to preserve original templates set to be unchanged
 		opts.templates = _.extend({}, opts.templates, templates);
-		printDebug(opts.templates, 'templates.json');	
+		//printDebug(opts.templates, 'templates.json');	
 		
 		if (Ti.Platform.osname == 'android') {
 			for (var binding in opts.templates) {
@@ -35,168 +35,200 @@ exports.createListView = function(opts) {
 	}
 	
 	// do not omit additional properties because they needed for validation etc
-	var list = Ti.UI.createListView(opts);
-	opts = undefined;
+	return Ti.UI.createListView(opts);
+};
+
+
+exports.createListSection = function(opts) {
+	if (!opts.columns) return Ti.UI.createListSection(opts);
+
+	// do not omit additional properties because they needed for validation etc
+	var section = Ti.UI.createListSection(_.omit(opts, 'items'));
 	
-	list.appendSection = _.wrap(list.appendSection, function(func, section, animation) {
-		if (!this.columns) {
-			throw "You must define `columns` property in ListView. It can be same value or greater.";
-		} else if (this.columns < section.columns) {
-			throw "ListView.columns property must be greater or equal ListViewSection.columns";
-		}			
-				
-		func.call(this, section, animation);
-	});	
-	
-	function setAddMarker(func, markerProps) {
-		var section = this.sections[markerProps.sectionIndex];
-		if(section.columns) {
-			markerProps = {
-				sectionIndex: markerProps.sectionIndex,
-				itemIndex: Math.floor(markerProps.itemIndex/section.columns)
-			};
-		}
-		func.call(this, markerProps);
+	if(opts.items) {		
+		this.setItems(section, opts.items);
+	}
+	return section;	
+};
+
+exports.DIVIDER = '@';
+
+exports.wrap = function(obj) {
+	var methods;
+	if(obj.apiName == 'Ti.UI.ListSection') {
+		methods = ['setItems', 'getItems', 'getItemAt', 'appendItems', 'insertItemsAt', 'replaceItemsAt', 'deleteItemsAt', 'updateItemAt'];		
+	} else if(obj.apiName == 'Ti.UI.ListView') {
+		methods = ['appendSection', 'setMarker', 'addMarker'];
 	}
 	
-	list.setMarker = _.wrap(list.setMarker, setAddMarker);
-	list.addMarker = _.wrap(list.addMarker, setAddMarker);
+	if(methods) {
+		return _.extend({obj: obj}, _.chain(methods).map(function(methodName) {
+			return [methodName, function() {
+				var mc = require('com.falkolab.lvmc');
+				return mc[methodName].apply(mc, [this.obj].concat(Array.prototype.slice.call(arguments)));
+			}];
+		}).object().value());
+	}	
+};
+
+// ***********************
+// ListView support helpers
+// ***********************
+exports.appendSection = function(listview, section, animation) {
+	if (!listview.columns) {
+		throw "You must define `columns` property in ListView. It can be same value or greater.";
+	} else if (listview.columns < section.columns) {
+		throw "ListView.columns property must be greater or equal ListViewSection.columns";
+	}			
+			
+	listview.appendSection(section, animation);
+};	
+
+function setAddMarker(funcName, listview, markerProps, columns /* optional */) {
+	var section = listview.sections[markerProps.sectionIndex];
+	var columns = columns || section.columns;
+	if(columns) {
+		markerProps = {
+			sectionIndex: markerProps.sectionIndex,
+			itemIndex: Math.floor(markerProps.itemIndex/columns)
+		};
+	}
+	listview[funcName](markerProps);
+}
 	
-	list.fixEvent = function(evt) {
-		if(evt.corrected === true) return;
-		if(evt.type == 'move') {
-			Ti.API.warn('targetItemIndex property was not corrected.');
-		}
+exports.setMarker = _.partial(setAddMarker, 'setMarker');
+exports.addMarker = _.partial(setAddMarker, 'addMarker');
+
+exports.transformEvent = function(evt, columns /* optional */) {
+	if(evt.transformed === true) return;
+	if(evt.type == 'move') {
+		Ti.API.warn('targetItemIndex property was not corrected.');
+	}
+	var columns;
+	
+	if(evt.section) {
+		var section = evt.section;
 		
-		if(evt.section && evt.section.columns) { 
-			var section = evt.section;
-			if(evt.hasOwnProperty('bindId')) {
+		columns = columns || evt.section.columns;
+		if(columns) {
+			if(evt.bindId) {
 				var parts = evt.bindId.split('@');
 				if(parts.length == 2) {
 					evt.bindId = parts[0];
 					if(evt.hasOwnProperty('itemIndex')) {
-						evt.itemIndex = evt.itemIndex * section.columns + parseInt(parts[1]);
+						evt.itemIndex = evt.itemIndex * columns + parseInt(parts[1]);
 					}
 				}		
 			}
 		}
-		
-		if(['scrollend', 'scrollstart'].indexOf(evt.type) >-1 && evt.firstVisibleSection.columns) {	
-			evt.firstVisibleItemIndex = evt.firstVisibleItemIndex * evt.firstVisibleSection.columns;
+	}
+	
+	if(['scrollend', 'scrollstart'].indexOf(evt.type) >-1) {
+		columns = columns || evt.firstVisibleSection.columns;
+		if(columns) {			
+			evt.firstVisibleItemIndex = evt.firstVisibleItemIndex * columns;
 			evt.visibleItemCount = Math.min(evt.firstVisibleSection.getItems().length - evt.firstVisibleItemIndex, 
-				evt.visibleItemCount * evt.firstVisibleSection.columns);
+				evt.visibleItemCount * columns);
 			evt.firstVisibleItem = evt.firstVisibleSection.getItemAt(evt.firstVisibleItemIndex);
 		}
-		
-		evt.corrected = true;
-	};
+	}
 	
-	// list.addEventListener('itemclick', function(evt) {
-		// if(!evt.section.columns || evt.ext === true) return;		
-		// //this.fireEvent(evt.type, evt);		
-	// });	
+	evt.transformed = true;
+};
 	
-	return list;
+// ***********************
+// ListSection support helpers
+// ***********************
+
+exports.setItems = function(section, items, columns /* optional */, defaultItemTemplate /* optional */) {
+	var columns = columns || section.columns,
+		defaultItemTemplate = defaultItemTemplate || section.defaultItemTemplate;
+	if(columns) {
+		validateNotTransformedItems(items);
+		items = transformDataItems(items, columns, defaultItemTemplate);
+	} 
+	//printDebug(items, 'dataItems.json');
+	section.setItems(items);
 };
 
-exports.createListSection = function(opts) {
-	if (!opts.columns) return Ti.UI.createListSection(opts);
-	// to preserve original options unchanged
-	opts = _.extend({}, opts);	
+exports.getItems = function(section) {	
+	return clone(Array.prototype.concat.apply([], _.map(section.getItems(), function(item) {
+			return item.properties.originalItems;
+		})
+	));
+};
 
-	// do not omit additional properties because they needed for validation etc
-	var section = Ti.UI.createListSection(_.omit(opts, 'items'));	
-				
-	section.setItems = _.wrap(section.setItems, function(func, items) {				
-		var transformedItems = transformDataItems(items, this.columns, this.defaultItemTemplate);
-		//printDebug(transformedItems, 'dataItems.json');
-		func.call(this, transformedItems);
-	});
-	section._getItems = section.getItems;
-	section.getItems = _.wrap(section.getItems, function(func) {
-		return clone(
-			Array.prototype.concat.apply([], 
-				_.map(this._getItems(), function(item) {
-					return item.properties.originalItems;
-				})
-			)
-		);
-	});
-
-	section.appendItems = _.wrap(section.appendItems, function(func, items, animation) {
-		if(!items || !items.length) return;		
+exports.getItemAt = function(section, itemIndex, columns /* optional */) {
+	var columns = columns || section.columns,
+		internalIndex = Math.floor(itemIndex / columns),
+		offset = itemIndex % columns;
 		
-		var offset = 0, currentItems = this._getItems(), last = _.last(currentItems);
+	return section.getItems()[internalIndex].properties.originalItems[offset];
+};
+
+exports.appendItems = function(section, items, animation, columns /* optional */, defaultItemTemplate /* optional */) {
+	var columns = columns || section.columns,
+		defaultItemTemplate = defaultItemTemplate || section.defaultItemTemplate;
+	if(columns) {
+		if(!items.length) return;
+		validateNotTransformedItems(items);		
+		
+		var offset = 0, currentItems = section.getItems(), last = _.last(currentItems);
 		if(last) {
-			offset = last.properties.originalItems.length % this.columns;
+			offset = last.properties.originalItems.length % columns;
 		}
 						 				
-		var transformedItems = transformDataItems(items, this.columns, this.defaultItemTemplate, offset);
+		items = transformDataItems(items, columns, defaultItemTemplate, offset);
 		
-		if(last && offset) {					
-			var item = _.extend(clone(last), transformedItems.shift());
-			this._updateItemAt(currentItems.length-1, item);
-		}			
-		func.call(this, transformedItems, animation);
-	});
+		if(last && offset) {
+			section.updateItemAt(currentItems.length-1, _.extend(clone(last), items.shift()));
+		}
+	}
 	
-	section._deleteItemsAt = section.deleteItemsAt;
-	
-	section.deleteItemsAt = _.wrap(section.deleteItemsAt, function(func, itemIndex, count, animation) {
-		// if(!count) return;
-		// var internalIndex = Math.floor(itemIndex/this.columns),
-			// offset = itemIndex % this.columns;
-// 					
-		// func.call(this, internalIndex, this._items.length - internalIndex, animation);
-// 				
-		// var itemsForRebuild = this._items.splice(internalIndex);
-		// var originalItems = Array.prototype.concat.apply([], 
-			// _.map(itemsForRebuild, function(item) {
-				// return item.properties.originalItems;
-			// })
-		// );								
-		// originalItems.splice(offset, count);
-		// this.appendItems(originalItems, animation);
-		
-		this.replaceItemsAt(itemIndex, count, [], animation);
-	});			
-	
-	section._getItemAt = section.getItemAt;			
-	section.getItemAt = _.wrap(section.getItemAt, function(func, itemIndex) {
-		var internalIndex = Math.floor(itemIndex/this.columns),
-			offset = itemIndex % this.columns,
-			currentItems = this._getItems();
-			
-		return currentItems[internalIndex].properties.originalItems[offset];
-	});
-	
-	section.insertItemsAt = _.wrap(section.insertItemsAt, function(func, itemIndex, dataItems, animation) {		
-		if(!dataItems || !dataItems.length) return;		
-		
-		var internalIndex = Math.floor(itemIndex/this.columns),
-			offset = itemIndex % this.columns, currentItems = this._getItems();
-			
-		this._deleteItemsAt(internalIndex, currentItems.length - internalIndex);
-		
-		var itemsForRebuild = currentItems.splice(internalIndex);
+	section.appendItems(items, animation);
+};
 
+exports.insertItemsAt = function(section, itemIndex, dataItems, animation, columns /* optional */, defaultItemTemplate /* optional */) {
+	var columns = columns || section.columns,
+		defaultItemTemplate = defaultItemTemplate || section.defaultItemTemplate;
+		
+	if(columns) {		
+		if(!dataItems.length) return;	
+		validateNotTransformedItems(dataItems);
+		
+		var internalIndex = Math.floor(itemIndex/columns),
+			offset = itemIndex % columns, currentItems = section.items;
+			
+		section.deleteItemsAt(internalIndex, currentItems.length - internalIndex);
+				
+		var itemsForRebuild = currentItems.splice(internalIndex);
+	
 		var originalItems = Array.prototype.concat.apply([], 
 			_.map(itemsForRebuild, function(item) {
 				return item.properties.originalItems;
 			})
 		);
 		
-		originalItems.splice.apply(originalItems, [offset, 0].concat(dataItems));				
-		this.appendItems(originalItems, animation);
-	});
-	
-	section.replaceItemsAt = _.wrap(section.replaceItemsAt, function(func, itemIndex, count, dataItems, animation) {
-		if(!count) return;		
-		var internalIndex = Math.floor(itemIndex/this.columns),
-			offset = itemIndex % this.columns,
-			currentItems = this._getItems();
+		originalItems.splice.apply(originalItems, [offset, 0].concat(dataItems));			
+		exports.appendItems(section, originalItems, animation, columns, defaultItemTemplate);
+	} else {
+		section.insertItemsAt(itemIndex, dataItems, animation);
+	}
+};
+
+exports.replaceItemsAt = function(section, itemIndex, count, dataItems, animation, columns /* optional */, defaultItemTemplate /* optional */) {
+	var columns = columns || section.columns,
+		defaultItemTemplate = defaultItemTemplate || section.defaultItemTemplate;
+		
+	if(columns) {
+		count = count || 0;
+		validateNotTransformedItems(dataItems);
+		
+		var internalIndex = Math.floor(itemIndex/columns),
+			offset = itemIndex % columns,
+			currentItems = section.getItems();
 			
-		this._deleteItemsAt.call(this, internalIndex, currentItems.length - internalIndex,
+		section.deleteItemsAt(internalIndex, currentItems.length - internalIndex,
 			// need animation if called from deleteItemsAt
 			dataItems.length == 0 ? animation: undefined);
 		
@@ -206,35 +238,46 @@ exports.createListSection = function(opts) {
 			_.map(itemsForRebuild, function(item) {
 				return item.properties.originalItems;
 			})
-		);								
+		);				
+					
 		originalItems.splice.apply(originalItems, [offset, count].concat(dataItems));
-		this.appendItems(originalItems,
-			// NOT need animation if called from deleteItemsAt 
-			dataItems.length == 0 ? undefined: animation);
-	});
-	
-	section._updateItemAt = section.updateItemAt;			
-	section.updateItemAt = _.wrap(section.updateItemAt, function(func, index, dataItem, animation) {
-		var internalIndex = Math.floor(index/this.columns),
-			offset = index % this.columns;
-			
-		var originalItems = this._getItemAt(internalIndex).properties.originalItems;				
-		originalItems.splice(offset, 1, dataItem);
 		
-		var transformed = transformDataItems(originalItems, this.columns, this.defaultItemTemplate);
-		func.call(this, internalIndex, transformed[0], animation);
-	});
-	
-	Object.defineProperty(section, 'items', {
-		get: section.getItems,
-		set: section.setItems
-	});
-	
-	if(opts.items) section.setItems(opts.items);
-	return section;	
+		exports.appendItems(section, originalItems,
+			// NOT need animation if called from deleteItemsAt 
+			dataItems.length == 0 ? undefined: animation, columns, defaultItemTemplate);			
+	} else {
+		section.appendItems(itemIndex, count, dataItems, animation);
+	}
 };
 
-exports.DIVIDER = '@';
+exports.deleteItemsAt =  function(section, itemIndex, count, animation, columns /* optional */, defaultItemTemplate /* optional */) {
+	var columns = columns || section.columns,
+		defaultItemTemplate = defaultItemTemplate || section.defaultItemTemplate;
+	if(columns) {
+		exports.replaceItemsAt(section, itemIndex, count, [], animation, columns /* optional */, defaultItemTemplate /* optional */);
+	} else {
+		section.deleteItemsAt(itemIndex, count, animation);
+	}
+};
+
+exports.updateItemAt = function(section, index, dataItem, animation, columns /* optional */, defaultItemTemplate /* optional */) {
+	var columns = columns || section.columns,
+		defaultItemTemplate = defaultItemTemplate || section.defaultItemTemplate;
+		
+	if(columns) {
+		validateNotTransformedItems([dataItem]);
+		var internalIndex = Math.floor(index/columns),
+			offset = index % columns;
+			
+		var originalItems = section.getItemAt(internalIndex).properties.originalItems;				
+		originalItems.splice(offset, 1, dataItem);
+		
+		var transformed = transformDataItems(originalItems, columns, defaultItemTemplate);
+		section.updateItemAt(internalIndex, transformed[0], animation);
+	} else {
+		section.updateItemAt(index, dataItem, animation);
+	}
+};
 
 function printDebug(data, fileName) {
 	//return;
@@ -242,7 +285,8 @@ function printDebug(data, fileName) {
 		var file = Titanium.Filesystem.getFile(Titanium.Filesystem.applicationDataDirectory, fileName);
 		file.write(JSON.stringify(data, null, '\t'));
 		file = null;
-		//alert(JSON.stringify(items, null, '\t'));
+		//alert(JSON.stringify(data, null, '\t'));
+		//Ti.API.info(JSON.stringify(data, null, '\t'));
 	}
 }
 
@@ -287,6 +331,13 @@ function clone(obj) {
 	throw new Error("Unable to copy obj! Its type isn't supported.");
 }
 
+function validateNotTransformedItems(items) {
+	_.each(items, function(item) {
+		if(item.template && item.template.lastIndexOf('extlist@',0) === 0) 
+			throw "Probably you use methods from `section` instance to obtain items. You must use exported functions from this library for that.";
+	});
+}
+
 function transformDataItems(items, columns, defaultItemTemplate, offset) {
 	var firstChunk,
 	    offset = offset || 0;
@@ -319,7 +370,8 @@ function transformDataItems(items, columns, defaultItemTemplate, offset) {
 		var dataItem = {
 			template : 'extlist@' + _.map(itemsChunk, function(item) {return item.template || defaultItemTemplate;}).join(exports.DIVIDER),
 			properties : {
-				originalItems: itemsChunk
+				originalItems: itemsChunk,
+				height: Ti.UI.SIZE
 			}
 		};
 
@@ -435,7 +487,6 @@ function transformTemplates(templates, columns) {
 	}
 	return _.object(result);
 }
-
 
 if (Ti.Platform.osname == 'android') {
 	//******************

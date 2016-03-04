@@ -1,5 +1,6 @@
 Titanium.UI.setBackgroundColor('#000');
 var _ = require('underscore');
+
 function transform(items) {
 	var result = [];
 	for(var i=0, l=items.length; i<l; i++) {
@@ -26,7 +27,8 @@ var win1 = Titanium.UI.createWindow({
 });
 
 var container = Ti.UI.createView({
-	layout: "vertical"
+	layout: "vertical",
+	height: Ti.UI.SIZE
 });
 
 var button1 = Ti.UI.createButton({
@@ -55,3 +57,6 @@ win1.add(container);
 
 
 win1.open();
+
+
+//require('listRunner').openExtList();

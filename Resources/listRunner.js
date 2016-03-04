@@ -56,26 +56,29 @@ function extList() {
 	
 	var sections = [];
 
-	var extListView = require('extListView');
-	var section1 = extListView.createListSection({
+	var lvmc = require('com.falkolab.lvmc');
+	var section1 = lvmc.createListSection({
 		items: adjustItemsSize(testData(), 3),
 		defaultItemTemplate: "template1",
 		columns: 3,
 		headerTitle: "Three column"
 	});
+	
 	sections.push(section1);
 		
-	var section2 = extListView.createListSection({		
-		//items: adjustItemsSize(testDataMixed(), 3),
+	var section2 = lvmc.createListSection({
 		defaultItemTemplate: "template1",
 		columns: 3,
 		headerTitle: "Mixed templates"
 	});	
 	
-	section2.items = adjustItemsSize(testDataMixed(), section2.columns);
+	lvmc.wrap(section2).setItems(adjustItemsSize(testDataMixed(), section2.columns));
+	// also you can use
+	// lvmc.setItems(section2, adjustItemsSize(testDataMixed(), section2.columns));
+	
 	sections.push(section2);
 	
-	var section3 = extListView.createListSection({
+	var section3 = lvmc.createListSection({
 		items: adjustItemsSize(testData(), 2),
 		defaultItemTemplate: "template1",
 		columns: 2,
@@ -89,27 +92,29 @@ function extList() {
 	});
 	sections.push(section4);
 
-	var list = extListView.createListView({		
+	var list = lvmc.createListView({		
 		sections : sections,
 		templates : templates,
 		defaultItemTemplate: "template1",		
 		columns: 3
-	});
-	
+	});	
 	
 	list.addEventListener('itemclick', function(evt) {
-		this.fixEvent(evt);
+		require('com.falkolab.lvmc').transformEvent(evt);
 		alert('`itemclick` event:\n'+ JSON.stringify(_.omit(evt, 'source', 'section'), null, '\t'));
 	});
+	
 	list.addEventListener('scrollend', function(evt) {
-		this.fixEvent(evt);
+		require('com.falkolab.lvmc').transformEvent(evt);
 		Ti.API.info('`scrollend` event:\n'+ JSON.stringify(_.omit(evt, 'source', 'firstVisibleSection'), null, '...'));
 	});
 	
 	// ***************************
 	// Uncomment lines for testing
 	// ***************************
-	// test for getItemAt, updateItemAt
+	// wrap section
+	section1 = lvmc.wrap(section1);
+	// test for getItemAt, updateItemAt	
 	var dataItem = section1.getItemAt(4);	
 	dataItem.name.text = 'This title changed!';
 	dataItem.name.color = "#ff0000";	
@@ -118,12 +123,17 @@ function extList() {
 	// test for deleteItemsAt
 	//section1.deleteItemsAt(1, 2);
 	// ***************************
-	//test for insertItemsAt
-	// section1.insertItemsAt(4, [section1.getItemAt(0)]);
+	// test for insertItemsAt
+	//var item = section1.getItemAt(0);
+	//section1.insertItemsAt(4, [item]);
 	// ***************************
-	//test for replaceItemsAt
-	// section1.replaceItemsAt(2, 4, [section1.getItemAt(0)]);
+	// test for replaceItemsAt
+	//var item = section1.getItemAt(0);
+	//section1.replaceItemsAt(2, 4, [item]);
 	// ***************************
+	
+	section1 = null;
+	lvmc = null;
 
 	demoWin.add(list);
 	demoWin.open();

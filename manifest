@@ -1,8 +1,8 @@
-#appname: extlistview
+#appname: lvmc demo
 #publisher: falko
 #url: 
 #image: appicon.png
-#appid: falkolab.extlistviewdemo
-#desc: undefined
-#type: ipad
-#guid: f248e9dc-c564-44de-8357-a6184c0e6902
+#appid: com.falkolab.lvmc.demo
+#desc: Demo application for multicolumn ListView helper library
+#type: 
+#guid: d3b8de3b-00b3-4b10-9888-e719bcdc1b6c

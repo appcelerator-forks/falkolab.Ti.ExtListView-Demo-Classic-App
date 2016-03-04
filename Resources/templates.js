@@ -1,6 +1,6 @@
 exports.templates = function() {	
- 	return {
-		'template1' : {
+ 	return { 		
+ 		'template1' : {
 			properties : {
 				name : "template1"
 			},
@@ -15,8 +15,8 @@ exports.templates = function() {
 					bindId : "avatar",
 					properties : {
 						bindId : "avatar",
-						width : Titanium.UI.FILL,
-						height : Titanium.UI.FILL
+						width : Titanium.UI.SIZE,
+						height : Titanium.UI.SIZE
 					}
 				}, {
 					type : "Ti.UI.View",										
@@ -32,7 +32,9 @@ exports.templates = function() {
 								fontSize : 11
 							},
 							bindId : "name",
-							color : "#000"
+							color : "#000",
+							width : Titanium.UI.SIZE,
+							height : Titanium.UI.SIZE
 						}
 					}],
 					properties : {
@@ -55,7 +57,9 @@ exports.templates = function() {
 						},
 						color : "#4c4c4c",
 						backgroundColor : "#ffffff",
-						bindId : "index"
+						bindId : "index",
+						width : Titanium.UI.SIZE,
+						height : Titanium.UI.SIZE
 					}
 				}]
 			}]
@@ -79,7 +83,7 @@ exports.templates = function() {
 						width : 50,
 						height : 50,
 						right: 0,
-						bottom: 0
+						bottom: 0						
 					}
 				}, {
 					type : "Ti.UI.View",					
@@ -96,7 +100,9 @@ exports.templates = function() {
 								fontWeight: 'bold'
 							},
 							bindId : "name",
-							color : "#000"
+							color : "#000",
+							width : Titanium.UI.SIZE,
+							height : Titanium.UI.SIZE
 						}
 					}],
 					properties : {
@@ -119,7 +125,9 @@ exports.templates = function() {
 						},
 						color : "#4c4c4c",
 						backgroundColor : "#ffffff",
-						bindId : "index"
+						bindId : "index",
+						width : Titanium.UI.SIZE,
+						height : Titanium.UI.SIZE
 					}
 				}]
 			}]

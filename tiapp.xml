@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ti:app xmlns:ti="http://ti.appcelerator.org">
-    <id>falkolab.extlistviewdemo</id>
-    <name>extlistview</name>
+    <id>com.falkolab.lvmc.demo</id>
+    <name>lvmc demo</name>
     <version>1.0</version>
     <publisher>falkolab</publisher>
-    <url>https://github.com/falkolab/Ti.ExtListView-Demo-Classic-App</url>
-    <description>Demo application for ExtListView library</description>
+    <url>https://github.com/falkolab/LVMC-Demo-Classic-App</url>
+    <description>Demo application for multicolumn ListView helper library.</description>
     <copyright>Andrey Tkachenko aka falkolab</copyright>
     <icon>appicon.png</icon>
     <fullscreen>false</fullscreen>
