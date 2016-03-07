@@ -1,28 +1,34 @@
-
-exports.createListView = function(opts) {	
+/* Multicolumn ListView helper library for Titanium SDK
+ *
+ * Copyright (C) 2016 Tkachenko Andrey
+ *
+ * This software may be modified and distributed under the terms
+ * of the MIT license.  See the LICENSE file for details.
+ */
+exports.createListView = function(opts) {
 	if (opts.sections) {
 		_.each(opts.sections, function(sectionOpts) {
 			if (!opts.columns) {
 				throw "You must define `columns` property in ListView. It can be same value or greater.";
 			} else if (opts.columns < sectionOpts.columns) {
 				throw "ListView.columns property must be greater or equal ListViewSection.columns";
-			}			
+			}
 		});
 	}
-	
+
 	if (!opts.columns) return Ti.UI.createListView(opts);
-	
+
 	// to preserve original options unchanged
 	opts = _.extend({}, opts);
 	var columns = opts.columns || 1;
-	
+
 	if (!_.isEmpty(opts.templates)) {
-		var templates = transformTemplates(opts.templates, columns);			
-		
+		var templates = transformTemplates(opts.templates, columns);
+
 		// to preserve original templates set to be unchanged
 		opts.templates = _.extend({}, opts.templates, templates);
-		//printDebug(opts.templates, 'templates.json');	
-		
+		//printDebug(opts.templates, 'templates.json');
+
 		if (Ti.Platform.osname == 'android') {
 			for (var binding in opts.templates) {
 				var currentTemplate = opts.templates[binding];
@@ -33,7 +39,7 @@ exports.createListView = function(opts) {
 			}
 		}
 	}
-	
+
 	// do not omit additional properties because they needed for validation etc
 	return Ti.UI.createListView(opts);
 };
@@ -44,11 +50,11 @@ exports.createListSection = function(opts) {
 
 	// do not omit additional properties because they needed for validation etc
 	var section = Ti.UI.createListSection(_.omit(opts, 'items'));
-	
-	if(opts.items) {		
+
+	if(opts.items) {
 		this.setItems(section, opts.items);
 	}
-	return section;	
+	return section;
 };
 
 exports.DIVIDER = '@';
@@ -56,19 +62,18 @@ exports.DIVIDER = '@';
 exports.wrap = function(obj) {
 	var methods;
 	if(obj.apiName == 'Ti.UI.ListSection') {
-		methods = ['setItems', 'getItems', 'getItemAt', 'appendItems', 'insertItemsAt', 'replaceItemsAt', 'deleteItemsAt', 'updateItemAt'];		
+		methods = ['setItems', 'getItems', 'getItemAt', 'appendItems', 'insertItemsAt', 'replaceItemsAt', 'deleteItemsAt', 'updateItemAt'];
 	} else if(obj.apiName == 'Ti.UI.ListView') {
 		methods = ['appendSection', 'setMarker', 'addMarker'];
 	}
-	
+    var self = this;
 	if(methods) {
 		return _.extend({obj: obj}, _.chain(methods).map(function(methodName) {
 			return [methodName, function() {
-				var mc = require('com.falkolab.lvmc');
-				return mc[methodName].apply(mc, [this.obj].concat(Array.prototype.slice.call(arguments)));
+				return self[methodName].apply(self, [this.obj].concat(Array.prototype.slice.call(arguments)));
 			}];
 		}).object().value());
-	}	
+	}
 };
 
 // ***********************
@@ -79,14 +84,14 @@ exports.appendSection = function(listview, section, animation) {
 		throw "You must define `columns` property in ListView. It can be same value or greater.";
 	} else if (listview.columns < section.columns) {
 		throw "ListView.columns property must be greater or equal ListViewSection.columns";
-	}			
-			
+	}
+
 	listview.appendSection(section, animation);
-};	
+};
 
 function setAddMarker(funcName, listview, markerProps, columns /* optional */) {
 	var section = listview.sections[markerProps.sectionIndex];
-	var columns = columns || section.columns;
+	columns = columns || section.columns;
 	if(columns) {
 		markerProps = {
 			sectionIndex: markerProps.sectionIndex,
@@ -95,7 +100,7 @@ function setAddMarker(funcName, listview, markerProps, columns /* optional */) {
 	}
 	listview[funcName](markerProps);
 }
-	
+
 exports.setMarker = _.partial(setAddMarker, 'setMarker');
 exports.addMarker = _.partial(setAddMarker, 'addMarker');
 
@@ -104,11 +109,10 @@ exports.transformEvent = function(evt, columns /* optional */) {
 	if(evt.type == 'move') {
 		Ti.API.warn('targetItemIndex property was not corrected.');
 	}
-	var columns;
-	
+
 	if(evt.section) {
 		var section = evt.section;
-		
+
 		columns = columns || evt.section.columns;
 		if(columns) {
 			if(evt.bindId) {
@@ -118,40 +122,40 @@ exports.transformEvent = function(evt, columns /* optional */) {
 					if(evt.hasOwnProperty('itemIndex')) {
 						evt.itemIndex = evt.itemIndex * columns + parseInt(parts[1]);
 					}
-				}		
+				}
 			}
 		}
 	}
-	
+
 	if(['scrollend', 'scrollstart'].indexOf(evt.type) >-1) {
 		columns = columns || evt.firstVisibleSection.columns;
-		if(columns) {			
+		if(columns) {
 			evt.firstVisibleItemIndex = evt.firstVisibleItemIndex * columns;
-			evt.visibleItemCount = Math.min(evt.firstVisibleSection.getItems().length - evt.firstVisibleItemIndex, 
+			evt.visibleItemCount = Math.min(evt.firstVisibleSection.getItems().length - evt.firstVisibleItemIndex,
 				evt.visibleItemCount * columns);
 			evt.firstVisibleItem = evt.firstVisibleSection.getItemAt(evt.firstVisibleItemIndex);
 		}
 	}
-	
+
 	evt.transformed = true;
 };
-	
+
 // ***********************
 // ListSection support helpers
 // ***********************
 
 exports.setItems = function(section, items, columns /* optional */, defaultItemTemplate /* optional */) {
-	var columns = columns || section.columns,
-		defaultItemTemplate = defaultItemTemplate || section.defaultItemTemplate;
+	columns = columns || section.columns;
+	defaultItemTemplate = defaultItemTemplate || section.defaultItemTemplate;
 	if(columns) {
 		validateNotTransformedItems(items);
 		items = transformDataItems(items, columns, defaultItemTemplate);
-	} 
+	}
 	//printDebug(items, 'dataItems.json');
 	section.setItems(items);
 };
 
-exports.getItems = function(section) {	
+exports.getItems = function(section) {
 	return clone(Array.prototype.concat.apply([], _.map(section.getItems(), function(item) {
 			return item.properties.originalItems;
 		})
@@ -159,57 +163,57 @@ exports.getItems = function(section) {
 };
 
 exports.getItemAt = function(section, itemIndex, columns /* optional */) {
-	var columns = columns || section.columns,
-		internalIndex = Math.floor(itemIndex / columns),
-		offset = itemIndex % columns;
-		
+	columns = columns || section.columns;
+	var internalIndex = Math.floor(itemIndex / columns),
+	   offset = itemIndex % columns;
+
 	return section.getItems()[internalIndex].properties.originalItems[offset];
 };
 
 exports.appendItems = function(section, items, animation, columns /* optional */, defaultItemTemplate /* optional */) {
-	var columns = columns || section.columns,
-		defaultItemTemplate = defaultItemTemplate || section.defaultItemTemplate;
+	columns = columns || section.columns;
+	defaultItemTemplate = defaultItemTemplate || section.defaultItemTemplate;
 	if(columns) {
 		if(!items.length) return;
-		validateNotTransformedItems(items);		
-		
+		validateNotTransformedItems(items);
+
 		var offset = 0, currentItems = section.getItems(), last = _.last(currentItems);
 		if(last) {
 			offset = last.properties.originalItems.length % columns;
 		}
-						 				
+
 		items = transformDataItems(items, columns, defaultItemTemplate, offset);
-		
+
 		if(last && offset) {
 			section.updateItemAt(currentItems.length-1, _.extend(clone(last), items.shift()));
 		}
 	}
-	
+
 	section.appendItems(items, animation);
 };
 
 exports.insertItemsAt = function(section, itemIndex, dataItems, animation, columns /* optional */, defaultItemTemplate /* optional */) {
-	var columns = columns || section.columns,
-		defaultItemTemplate = defaultItemTemplate || section.defaultItemTemplate;
-		
-	if(columns) {		
-		if(!dataItems.length) return;	
+	columns = columns || section.columns;
+	defaultItemTemplate = defaultItemTemplate || section.defaultItemTemplate;
+
+	if(columns) {
+		if(!dataItems.length) return;
 		validateNotTransformedItems(dataItems);
-		
+
 		var internalIndex = Math.floor(itemIndex/columns),
 			offset = itemIndex % columns, currentItems = section.items;
-			
+
 		section.deleteItemsAt(internalIndex, currentItems.length - internalIndex);
-				
+
 		var itemsForRebuild = currentItems.splice(internalIndex);
-	
-		var originalItems = Array.prototype.concat.apply([], 
+
+		var originalItems = Array.prototype.concat.apply([],
 			_.map(itemsForRebuild, function(item) {
 				return item.properties.originalItems;
 			})
 		);
-		
-		originalItems.splice.apply(originalItems, [offset, 0].concat(dataItems));			
+
+		originalItems.splice.apply(originalItems, [offset, 0].concat(dataItems));
 		exports.appendItems(section, originalItems, animation, columns, defaultItemTemplate);
 	} else {
 		section.insertItemsAt(itemIndex, dataItems, animation);
@@ -217,42 +221,43 @@ exports.insertItemsAt = function(section, itemIndex, dataItems, animation, colum
 };
 
 exports.replaceItemsAt = function(section, itemIndex, count, dataItems, animation, columns /* optional */, defaultItemTemplate /* optional */) {
-	var columns = columns || section.columns,
-		defaultItemTemplate = defaultItemTemplate || section.defaultItemTemplate;
-		
+	columns = columns || section.columns;
+	defaultItemTemplate = defaultItemTemplate || section.defaultItemTemplate;
+
 	if(columns) {
 		count = count || 0;
 		validateNotTransformedItems(dataItems);
-		
+
 		var internalIndex = Math.floor(itemIndex/columns),
 			offset = itemIndex % columns,
 			currentItems = section.getItems();
-			
+
 		section.deleteItemsAt(internalIndex, currentItems.length - internalIndex,
 			// need animation if called from deleteItemsAt
-			dataItems.length == 0 ? animation: undefined);
-		
+			dataItems.length === 0 ? animation: undefined);
+
 		var itemsForRebuild = currentItems.splice(internalIndex);
-		
-		var originalItems = Array.prototype.concat.apply([], 
+
+		var originalItems = Array.prototype.concat.apply([],
 			_.map(itemsForRebuild, function(item) {
 				return item.properties.originalItems;
 			})
-		);				
-					
+		);
+
 		originalItems.splice.apply(originalItems, [offset, count].concat(dataItems));
-		
+
 		exports.appendItems(section, originalItems,
-			// NOT need animation if called from deleteItemsAt 
-			dataItems.length == 0 ? undefined: animation, columns, defaultItemTemplate);			
+			// NOT need animation if called from deleteItemsAt
+			dataItems.length === 0 ? undefined: animation, columns, defaultItemTemplate);
 	} else {
 		section.appendItems(itemIndex, count, dataItems, animation);
 	}
 };
 
 exports.deleteItemsAt =  function(section, itemIndex, count, animation, columns /* optional */, defaultItemTemplate /* optional */) {
-	var columns = columns || section.columns,
-		defaultItemTemplate = defaultItemTemplate || section.defaultItemTemplate;
+	columns = columns || section.columns;
+	defaultItemTemplate = defaultItemTemplate || section.defaultItemTemplate;
+
 	if(columns) {
 		exports.replaceItemsAt(section, itemIndex, count, [], animation, columns /* optional */, defaultItemTemplate /* optional */);
 	} else {
@@ -261,17 +266,17 @@ exports.deleteItemsAt =  function(section, itemIndex, count, animation, columns 
 };
 
 exports.updateItemAt = function(section, index, dataItem, animation, columns /* optional */, defaultItemTemplate /* optional */) {
-	var columns = columns || section.columns,
-		defaultItemTemplate = defaultItemTemplate || section.defaultItemTemplate;
-		
+	columns = columns || section.columns;
+	defaultItemTemplate = defaultItemTemplate || section.defaultItemTemplate;
+
 	if(columns) {
 		validateNotTransformedItems([dataItem]);
 		var internalIndex = Math.floor(index/columns),
 			offset = index % columns;
-			
-		var originalItems = section.getItemAt(internalIndex).properties.originalItems;				
+
+		var originalItems = section.getItemAt(internalIndex).properties.originalItems;
 		originalItems.splice(offset, 1, dataItem);
-		
+
 		var transformed = transformDataItems(originalItems, columns, defaultItemTemplate);
 		section.updateItemAt(internalIndex, transformed[0], animation);
 	} else {
@@ -281,7 +286,7 @@ exports.updateItemAt = function(section, index, dataItem, animation, columns /* 
 
 function printDebug(data, fileName) {
 	//return;
-	if (Ti.App.deployType == "development") {			
+	if (Ti.App.deployType == "development") {
 		var file = Titanium.Filesystem.getFile(Titanium.Filesystem.applicationDataDirectory, fileName);
 		file.write(JSON.stringify(data, null, '\t'));
 		file = null;
@@ -295,7 +300,7 @@ function clone(obj) {
 	var omit = Array.prototype.slice.call(arguments, 1);
 
 	// Handle the 3 simple types, and null or undefined
-	if (null == obj || "object" != typeof obj)
+	if (null === obj || "object" != typeof obj)
 		return obj;
 
 	// Handle Date
@@ -318,8 +323,8 @@ function clone(obj) {
 	// Handle Object
 	if ( obj instanceof Object) {
 		copy = {};
-		for (var attr in obj) {			
-			if(omit && omit.indexOf(attr)>=0) {				
+		for (var attr in obj) {
+			if(omit && omit.indexOf(attr)>=0) {
 				continue;
 			}
 			if (obj.hasOwnProperty(attr))
@@ -333,22 +338,22 @@ function clone(obj) {
 
 function validateNotTransformedItems(items) {
 	_.each(items, function(item) {
-		if(item.template && item.template.lastIndexOf('extlist@',0) === 0) 
+		if(item.template && item.template.lastIndexOf('extlist@',0) === 0)
 			throw "Probably you use methods from `section` instance to obtain items. You must use exported functions from this library for that.";
 	});
 }
 
 function transformDataItems(items, columns, defaultItemTemplate, offset) {
-	var firstChunk,
-	    offset = offset || 0;
-	    
+	var firstChunk;
+	offset = offset || 0;
+
 	// to preserve original items unchanged
 	//items = clone(items);
 
 	if(!defaultItemTemplate) {
 		_.each(items, function(item) {
-			if (!_.has(item, 'template')) {			
-				throw "You must to set defaultItemTemplate for section or for each items";			
+			if (!_.has(item, 'template')) {
+				throw "You must to set defaultItemTemplate for section or for each items";
 			}
 		});
 	}
@@ -366,7 +371,7 @@ function transformDataItems(items, columns, defaultItemTemplate, offset) {
 	}
 
 	return _.map(chunks, function(itemsChunk) {
-		
+
 		var dataItem = {
 			template : 'extlist@' + _.map(itemsChunk, function(item) {return item.template || defaultItemTemplate;}).join(exports.DIVIDER),
 			properties : {
@@ -378,12 +383,12 @@ function transformDataItems(items, columns, defaultItemTemplate, offset) {
 		for (var i = 0, l = itemsChunk.length; i < l; i++) {
 		   	// WARN: references to original `item` object is preserved here
 			var sourceItem = itemsChunk[i];
-			
-			for (var attr in sourceItem) {			
+
+			for (var attr in sourceItem) {
 				if(attr == 'properties' || attr == 'template') continue;
 				dataItem[attr + exports.DIVIDER + i] = sourceItem[attr];
 			}
-	
+
 			if (sourceItem.properties) {
 				dataItem['itemContainer@' + i] = sourceItem.properties;
 			}
@@ -392,10 +397,10 @@ function transformDataItems(items, columns, defaultItemTemplate, offset) {
 	});
 }
 
-function transformTemplates(templates, columns) {	
+function transformTemplates(templates, columns) {
 	function renameBindIds(template, suffix, index) {
-		index = index || 0;	
-		
+		index = index || 0;
+
 		if(template.bindId) {
 			if(template.bindId.split(exports.DIVIDER).length!==2) {
 				template.bindId = template.bindId + suffix;
@@ -404,20 +409,20 @@ function transformTemplates(templates, columns) {
 			// it need for index conversion in fixEvent
 			template.bindId = '_' + (index++) + suffix;
 		}
-		
+
 		if (template.childTemplates) {
 			_.each(template.childTemplates, function(template) {
 				renameBindIds(template, suffix, index);
 			});
 		}
 	}
-	
+
 	function combinator(source, n) {
 		var matrix = [];
 		while (n--) {
 			matrix.push(source);
 		}
-	
+
 		return matrix.reduceRight(function(combination, x) {
 			var result = [];
 			x.forEach(function(a) {
@@ -427,12 +432,13 @@ function transformTemplates(templates, columns) {
 			});
 			return result;
 		});
-	};
+	}
 
 	var names = Object.keys(templates);
 
 	var result = [];
 	for (var n = 1; n <= columns; n++) {
+        /* jshint -W083 */
 		result.push.apply(result, _.chain(combinator(names, n)).map(function(combination, rowIndex) {
 			if(!_.isArray(combination)) {
 				combination = [combination];
@@ -441,7 +447,7 @@ function transformTemplates(templates, columns) {
 			var containerTemplate = {
 				type : 'Ti.UI.View',
 				bindId : 'rowContainer@' + rowIndex,
-				properties : {					
+				properties : {
 					layout : 'horizontal',
 					horizontalWrap : false,
 					width : Ti.UI.FILL,
@@ -474,7 +480,7 @@ function transformTemplates(templates, columns) {
 
 				var childTemplates = templates[templateName].childTemplates;
 				if (childTemplates) {
-					childTemplates = clone(childTemplates, 'tiProxy' /*omit this property*/);					
+					childTemplates = clone(childTemplates, 'tiProxy' /*omit this property*/);
 					itemContainerTemplate.childTemplates = childTemplates;
 				}
 
@@ -484,73 +490,75 @@ function transformTemplates(templates, columns) {
 
 			return [name, template];
 		}).value());
+        /* jshint +W083 */
 	}
 	return _.object(result);
 }
 
-if (Ti.Platform.osname == 'android') {
-	//******************
-	// Android Platform code
-	//Create ListItemProxy, add events, then store it in 'tiProxy' property
-	function processTemplate(properties) {
-		var cellProxy = Titanium.UI.createListItem();
-		properties.tiProxy = cellProxy;
-		var events = properties.events;
-		addEventListeners(events, cellProxy);
-	}
 
-	//Recursive function that process childTemplates and append corresponding proxies to
-	//property 'tiProxy'. I.e: type: "Titanium.UI.Label" -> tiProxy: LabelProxy object
-	function processChildTemplates(properties) {
-		if (!properties.hasOwnProperty('childTemplates'))
-			return;
+//******************
+// Android Platform code
+//Create ListItemProxy, add events, then store it in 'tiProxy' property
+function processTemplate(properties) {
+	var cellProxy = Titanium.UI.createListItem();
+	properties.tiProxy = cellProxy;
+	var events = properties.events;
+	addEventListeners(events, cellProxy);
+}
 
-		var childProperties = properties.childTemplates;
-		if (childProperties ===	void 0 || childProperties === null)
-			return;
+//Recursive function that process childTemplates and append corresponding proxies to
+//property 'tiProxy'. I.e: type: "Titanium.UI.Label" -> tiProxy: LabelProxy object
+function processChildTemplates(properties) {
+	if (!properties.hasOwnProperty('childTemplates'))
+		return;
 
-		for (var i = 0; i < childProperties.length; i++) {
-			var child = childProperties[i];
-			var proxyType = child.type;
-			if (proxyType !== void 0 && child.tiProxy === void 0) {
-				var creationProperties = child.properties;
-				var creationFunction = lookup(proxyType);
-				var childProxy;
-				//create the proxy
-				if (creationProperties !== void 0) {
-					childProxy = creationFunction(creationProperties);
-				} else {
-					childProxy = creationFunction();
-				}
-				//add event listeners
-				var events = child.events;
-				addEventListeners(events, childProxy);
-				//append proxy to tiProxy property
-				child.tiProxy = childProxy;
+	var childProperties = properties.childTemplates;
+	if (childProperties ===	void 0 || childProperties === null)
+		return;
+
+	for (var i = 0; i < childProperties.length; i++) {
+		var child = childProperties[i];
+		var proxyType = child.type;
+		if (proxyType !== void 0 && child.tiProxy === void 0) {
+			var creationProperties = child.properties;
+			var creationFunction = lookup(proxyType);
+			var childProxy;
+			//create the proxy
+			if (creationProperties !== void 0) {
+				childProxy = creationFunction(creationProperties);
+			} else {
+				childProxy = creationFunction();
 			}
+			//add event listeners
+			var events = child.events;
+			addEventListeners(events, childProxy);
+			//append proxy to tiProxy property
+			child.tiProxy = childProxy;
+		}
 
-			processChildTemplates(child);
+		processChildTemplates(child);
+	}
+}
+
+//add event listeners
+function addEventListeners(events, proxy) {
+	if (events !== void 0) {
+		for (var eventName in events) {
+			proxy.addEventListener(eventName, events[eventName]);
 		}
 	}
+}
 
-	//add event listeners
-	function addEventListeners(events, proxy) {
-		if (events !== void 0) {
-			for (var eventName in events) {
-				proxy.addEventListener(eventName, events[eventName]);
-			}
-		}
-	}
+//convert name of UI elements into a constructor function.
+//I.e: lookup("Titanium.UI.Label") returns Titanium.UI.createLabel function
+function lookup(name) {
+	var lastDotIndex = name.lastIndexOf('.');
+    /* jshint -W061 */
+	var proxy = eval(name.substring(0, lastDotIndex));
+    /* jshint +W061 */
+	if ( typeof (proxy) === undefined)
+		return;
 
-	//convert name of UI elements into a constructor function.
-	//I.e: lookup("Titanium.UI.Label") returns Titanium.UI.createLabel function
-	function lookup(name) {
-		var lastDotIndex = name.lastIndexOf('.');
-		var proxy = eval(name.substring(0, lastDotIndex));
-		if ( typeof (proxy) == undefined)
-			return;
-
-		var proxyName = name.slice(lastDotIndex + 1);
-		return proxy['create' + proxyName];
-	}
+	var proxyName = name.slice(lastDotIndex + 1);
+	return proxy['create' + proxyName];
 }

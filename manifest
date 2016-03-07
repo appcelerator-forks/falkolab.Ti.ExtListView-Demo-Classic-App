@@ -1,6 +1,6 @@
 #appname: lvmc demo
 #publisher: falko
-#url: 
+#url: https://github.com/falkolab
 #image: appicon.png
 #appid: com.falkolab.lvmc.demo
 #desc: Demo application for multicolumn ListView helper library
