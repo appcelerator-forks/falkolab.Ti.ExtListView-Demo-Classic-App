@@ -1,0 +1,8 @@
+guid
+build
+.map
+.project
+.settings
+.DS_Store
+Thumbs.db
+build.log

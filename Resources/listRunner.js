@@ -128,8 +128,8 @@ function extList() {
 	//section1.insertItemsAt(4, [item]);
 	// ***************************
 	// test for replaceItemsAt
-	//var item = section1.getItemAt(0);
-	//section1.replaceItemsAt(2, 4, [item]);
+	// var item = section1.getItemAt(0);
+	// section1.replaceItemsAt(2, 4, [item]);
 	// ***************************
 	
 	section1 = null;
